@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Witchy Potion Mixer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🔮 Witchy Potion Mixer 🔮</h1>
+        <p class="subtitle">Find ingredients in the word search, then brew mystical potions</p>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('search')">Word Search</button>
+            <button class="tab-btn" onclick="switchTab('mixer')">Potion Mixer</button>
+            <button class="tab-btn" onclick="switchTab('tower')">Tower</button>
+        </div>
+
+        <div id="searchPage" class="page active">
+            <div class="word-search-layout">
+                <div class="panel">
+                    <h2>Find the Ingredients</h2>
+                    <div class="progress-bar">
+                        <span id="progressText">Found: 0 / 20</span>
+                    </div>
+                    <div class="grid-container" id="wordGrid"></div>
+                    <button class="regenerate-btn" onclick="regenerateGrid()">Generate New Puzzle</button>
+                    <button class="regenerate-btn" onclick="clearProgress()" style="background: #8b4444; margin-top: 10px;">Clear All Progress</button>
+                </div>
+                <div class="panel">
+                    <h2>Current Puzzle</h2>
+                    <div class="words-list" id="wordsList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="mixerPage" class="page">
+            <div class="main-grid">
+                <div class="panel">
+                    <h2>Ingredients</h2>
+                    <div class="ingredients-grid" id="ingredientsGrid"></div>
+                    <button class="mix-button" id="mixButton" disabled>Mix Potion</button>
+                    <div class="export-buttons">
+                        <button class="export-btn" onclick="exportEncrypted()">Export (Encrypted)</button>
+                        <button class="export-btn" onclick="exportDummy()">Export (Plain)</button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>Your Potions <span id="potionCount" class="potion-count"></span></h2>
+                    <div class="potion-list" id="potionList">
+                        <div class="empty-state">No potions brewed yet. Unlock ingredients and mix!</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== GLOBAL DATA ==========
+        let INGREDIENTS_DATA = [];
+        let POTIONS_DATA = {};
+        let TOTAL_POSSIBLE_POTIONS = 0;
+
+        // ========== GAME STATE ==========
+        const GRID_SIZE = 15;
+        const INGREDIENTS_PER_PUZZLE = 5;
+        const DIRECTIONS = [
+            [0, 1], [1, 0], [1, 1], [-1, 1],
+            [0, -1], [-1, 0], [-1, -1], [1, -1]
+        ];
+
+        let state = {
+            selectedIngredients: [],
+            potions: [],
+            unlockedIngredients: [],
+            foundWords: [],
+            grid: [],
+            wordPositions: {},
+            currentSelection: [],
+            currentPuzzleWords: []
+        };
+
+        // ========== LOCAL STORAGE PERSISTENCE ==========
+        const STORAGE_KEY = 'witchyPotionMixer_saveData';
+
+        function saveProgress() {
+            const saveData = {
+                unlockedIngredients: state.unlockedIngredients,
+                foundWords: state.foundWords,
+                potions: state.potions,
+                version: '1.0',
+                savedAt: new Date().toISOString()
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+            console.log('Progress saved:', saveData);
+        }
+
+        function loadProgress() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (!saved) {
+                    console.log('No saved progress found');
+                    return false;
+                }
+                
+                const saveData = JSON.parse(saved);
+                console.log('Loading saved progress:', saveData);
+                
+                state.unlockedIngredients = saveData.unlockedIngredients || [];
+                state.foundWords = saveData.foundWords || [];
+                state.potions = saveData.potions || [];
+                
+                console.log('Progress loaded successfully');
+                return true;
+            } catch (error) {
+                console.error('Error loading saved progress:', error);
+                return false;
+            }
+        }
+
+        function clearProgress() {
+            if (confirm('Are you sure you want to clear all progress? This cannot be undone.')) {
+                localStorage.removeItem(STORAGE_KEY);
+                location.reload();
+            }
+        }
+
+        // ========== DATA LOADING ==========
+        async function loadData() {
+            try {
+                // Try loading ingredients
+                const ingredientsRes = await fetch('ingredients_data.json');
+                if (!ingredientsRes.ok) {
+                    throw new Error(`Failed to load ingredients_data.json: ${ingredientsRes.status}`);
+                }
+                const ingredientsText = await ingredientsRes.text();
+                console.log('Ingredients file loaded, length:', ingredientsText.length);
+                console.log('First 100 chars:', ingredientsText.substring(0, 100));
+                INGREDIENTS_DATA = JSON.parse(ingredientsText);
+                console.log('Ingredients parsed successfully:', INGREDIENTS_DATA.length, 'items');
+                
+                // Try loading potions
+                const potionsRes = await fetch('potions_data.json');
+                if (!potionsRes.ok) {
+                    throw new Error(`Failed to load potions_data.json: ${potionsRes.status}`);
+                }
+                const potionsText = await potionsRes.text();
+                console.log('Potions file loaded, length:', potionsText.length);
+                console.log('First 100 chars:', potionsText.substring(0, 100));
+                POTIONS_DATA = JSON.parse(potionsText);
+                console.log('Potions parsed successfully:', Object.keys(POTIONS_DATA).length, 'potions');
+                
+                TOTAL_POSSIBLE_POTIONS = Object.keys(POTIONS_DATA).length;
+                
+                initializeGame();
+            } catch (error) {
+                console.error('Error loading data files:', error);
+                alert(`Error loading game data: ${error.message}\n\nCheck the browser console (F12) for details.\n\nMake sure:\n1. Files are named exactly: ingredients_data.json and potions_data.json\n2. Files are valid JSON (no trailing commas, use double quotes)\n3. Files are in the same directory as index.html`);
+            }
+        }
+
+        function initializeGame() {
+            loadProgress(); // Load saved progress first
+            createGrid();
+            renderGrid();
+            updateWordsList();
+            updateMixerUI();
+        }
+
+        // ========== POTION GENERATION ==========
+        function getIngredientIndices(ingredients) {
+            return ingredients
+                .map(ing => INGREDIENTS_DATA.indexOf(ing))
+                .sort((a, b) => a - b);
+        }
+
+        function generatePotionKey(ingredients) {
+            const indices = getIngredientIndices(ingredients);
+            return indices.join('-');
+        }
+
+        function generatePotion(ingredients) {
+            const sorted = [...ingredients].sort();
+            const key = generatePotionKey(ingredients);
+            
+            if (POTIONS_DATA[key]) {
+                return {
+                    name: POTIONS_DATA[key].name,
+                    description: POTIONS_DATA[key].description,
+                    ingredients: sorted,
+                    key: key
+                };
+            }
+            
+            const hash = hashString(sorted.join('|'));
+            
+            const prefixes = ['Elixir of', 'Draught of', 'Brew of', 'Tonic of', 'Essence of'];
+            const qualities = ['Whispering', 'Eternal', 'Forbidden', 'Ancient', 'Midnight'];
+            const nouns = ['Dreams', 'Secrets', 'Visions', 'Wisdom', 'Power'];
+            
+            const prefix = prefixes[hash % prefixes.length];
+            const quality = qualities[Math.floor(hash / 10) % qualities.length];
+            const noun = nouns[Math.floor(hash / 100) % nouns.length];
+            
+            return {
+                name: `${prefix} ${quality} ${noun}`,
+                description: `A mysterious concoction combining ${sorted[0].toLowerCase()}, ${sorted[1].toLowerCase()}, and ${sorted[2].toLowerCase()}. Its true properties remain unknown to modern witches.`,
+                ingredients: sorted,
+                key: key
+            };
+        }
+
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & hash;
+            }
+            return Math.abs(hash);
+        }
+
+        // ========== COMBO CHECKING ==========
+        function isPotionAlreadyMade(ingredient) {
+            if (state.selectedIngredients.length === 0) return false;
+            
+            const testIngredients = [...state.selectedIngredients, ingredient].sort();
+            if (testIngredients.length < 3) return false;
+            
+            const testKey = generatePotionKey(testIngredients);
+            return state.potions.some(p => p.key === testKey);
+        }
+
+        function getDiscoveredCount() {
+            return state.potions.length;
+        }
+
+        // ========== UI FUNCTIONS ==========
+        function switchTab(tab) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            if (tab === 'search') {
+                document.getElementById('searchPage').classList.add('active');
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            } else {
+                document.getElementById('mixerPage').classList.add('active');
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            }
+        }
+
+        function regenerateGrid() {
+            createGrid();
+            renderGrid();
+            updateWordsList();
+        }
+
+        // ========== WORD SEARCH LOGIC ==========
+        function createGrid() {
+            const grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(''));
+            const positions = {};
+
+            const remainingIngredients = INGREDIENTS_DATA.filter(ing => !state.unlockedIngredients.includes(ing));
+            
+            const shuffled = [...remainingIngredients]
+                .sort(() => Math.random() - 0.5)
+                .slice(0, Math.min(INGREDIENTS_PER_PUZZLE, remainingIngredients.length));
+
+            state.currentPuzzleWords = shuffled;
+
+            shuffled.forEach(ingredient => {
+                const words = ingredient.toUpperCase().split(' ');
+                
+                words.forEach(word => {
+                    let placed = false;
+                    let attempts = 0;
+
+                    while (!placed && attempts < 200) {
+                        const dir = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
+                        const row = Math.floor(Math.random() * GRID_SIZE);
+                        const col = Math.floor(Math.random() * GRID_SIZE);
+
+                        if (canPlaceWord(grid, word, row, col, dir)) {
+                            placeWord(grid, word, row, col, dir, positions);
+                            placed = true;
+                        }
+                        attempts++;
+                    }
+                });
+            });
+
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    if (grid[i][j] === '') {
+                        grid[i][j] = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+                    }
+                }
+            }
+
+            state.grid = grid;
+            state.wordPositions = positions;
+        }
+
+        function canPlaceWord(grid, word, row, col, dir) {
+            for (let i = 0; i < word.length; i++) {
+                const newRow = row + dir[0] * i;
+                const newCol = col + dir[1] * i;
+
+                if (newRow < 0 || newRow >= GRID_SIZE || newCol < 0 || newCol >= GRID_SIZE) {
+                    return false;
+                }
+
+                if (grid[newRow][newCol] !== '' && grid[newRow][newCol] !== word[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function placeWord(grid, word, row, col, dir, positions) {
+            const coords = [];
+            for (let i = 0; i < word.length; i++) {
+                const newRow = row + dir[0] * i;
+                const newCol = col + dir[1] * i;
+                grid[newRow][newCol] = word[i];
+                coords.push([newRow, newCol]);
+            }
+            positions[word] = coords;
+        }
+
+        function renderGrid() {
+            const gridEl = document.getElementById('wordGrid');
+            gridEl.innerHTML = '';
+
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.textContent = state.grid[i][j];
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    
+                    cell.addEventListener('mousedown', startSelection);
+                    cell.addEventListener('mouseenter', continueSelection);
+                    cell.addEventListener('mouseup', endSelection);
+                    cell.addEventListener('touchstart', handleTouchStart);
+                    cell.addEventListener('touchmove', handleTouchMove);
+                    cell.addEventListener('touchend', endSelection);
+                    
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.dataset.row) {
+                state.currentSelection = [[parseInt(target.dataset.row), parseInt(target.dataset.col)]];
+                target.classList.add('selected');
+            }
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.dataset.row && state.currentSelection.length > 0) {
+                const row = parseInt(target.dataset.row);
+                const col = parseInt(target.dataset.col);
+                
+                const last = state.currentSelection[state.currentSelection.length - 1];
+                if (last[0] !== row || last[1] !== col) {
+                    state.currentSelection.push([row, col]);
+                    target.classList.add('selected');
+                }
+            }
+        }
+
+        function startSelection(e) {
+            state.currentSelection = [[parseInt(e.target.dataset.row), parseInt(e.target.dataset.col)]];
+            e.target.classList.add('selected');
+        }
+
+        function continueSelection(e) {
+            if (state.currentSelection.length === 0 || e.buttons !== 1) return;
+            
+            const row = parseInt(e.target.dataset.row);
+            const col = parseInt(e.target.dataset.col);
+            const start = state.currentSelection[0];
+            
+            // Calculate direction from start to current position
+            const dRow = row - start[0];
+            const dCol = col - start[1];
+            
+            // If we haven't moved, don't do anything
+            if (dRow === 0 && dCol === 0) return;
+            
+            // Calculate the angle from start to current position
+            const angle = Math.atan2(dRow, dCol);
+            
+            // Define the 8 possible directions with their angles
+            const directions = [
+                { row: 0, col: 1, angle: 0 },                    // East
+                { row: 1, col: 1, angle: Math.PI / 4 },          // Southeast
+                { row: 1, col: 0, angle: Math.PI / 2 },          // South
+                { row: 1, col: -1, angle: 3 * Math.PI / 4 },     // Southwest
+                { row: 0, col: -1, angle: Math.PI },             // West
+                { row: -1, col: -1, angle: -3 * Math.PI / 4 },   // Northwest
+                { row: -1, col: 0, angle: -Math.PI / 2 },        // North
+                { row: -1, col: 1, angle: -Math.PI / 4 }         // Northeast
+            ];
+            
+            // Find the direction with the smallest angular difference
+            let bestDirection = directions[0];
+            let smallestDiff = Math.PI;
+            
+            for (const dir of directions) {
+                let diff = Math.abs(angle - dir.angle);
+                // Handle wraparound (e.g., -π and π are the same)
+                if (diff > Math.PI) diff = 2 * Math.PI - diff;
+                
+                if (diff < smallestDiff) {
+                    smallestDiff = diff;
+                    bestDirection = dir;
+                }
+            }
+            
+            // Clear previous selection visually
+            document.querySelectorAll('.grid-cell.selected').forEach(cell => {
+                cell.classList.remove('selected');
+            });
+            
+            // Build the complete path from start to current position
+            state.currentSelection = [start];
+            let currentRow = start[0];
+            let currentCol = start[1];
+            
+            // Calculate how many steps to take
+            const steps = Math.max(Math.abs(dRow), Math.abs(dCol));
+            
+            for (let i = 1; i <= steps; i++) {
+                currentRow = start[0] + (bestDirection.row * i);
+                currentCol = start[1] + (bestDirection.col * i);
+                
+                // Check if still in bounds
+                const cell = document.querySelector(`[data-row='${currentRow}'][data-col='${currentCol}']`);
+                if (!cell) break;
+                
+                state.currentSelection.push([currentRow, currentCol]);
+            }
+            
+            // Apply selection styling
+            state.currentSelection.forEach(([r, c]) => {
+                const cell = document.querySelector(`[data-row='${r}'][data-col='${c}']`);
+                if (cell) cell.classList.add('selected');
+            });
+        }
+
+        function endSelection() {
+            if (state.currentSelection.length > 0) {
+                checkWord();
+                clearSelection();
+            }
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.grid-cell.selected').forEach(cell => {
+                if (!cell.classList.contains('found')) {
+                    cell.classList.remove('selected');
+                }
+            });
+            state.currentSelection = [];
+        }
+
+        function checkWord() {
+            const word = state.currentSelection.map(([r, c]) => state.grid[r][c]).join('');
+            const wordReverse = word.split('').reverse().join('');
+
+            state.currentPuzzleWords.forEach(ingredient => {
+                const words = ingredient.toUpperCase().split(' ');
+                
+                words.forEach(subWord => {
+                    if ((word === subWord || wordReverse === subWord) && state.wordPositions[subWord]) {
+                        const positions = state.wordPositions[subWord];
+                        positions.forEach(([r, c]) => {
+                            const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                            if (cell) cell.classList.add('found');
+                        });
+
+                        delete state.wordPositions[subWord];
+
+                        const allWordsFound = ingredient.toUpperCase().split(' ').every(w => !state.wordPositions[w]);
+                        
+                        if (allWordsFound && !state.foundWords.includes(ingredient)) {
+                            state.foundWords.push(ingredient);
+                            state.unlockedIngredients.push(ingredient);
+                            saveProgress(); // Save when ingredient unlocked
+                            updateWordsList();
+                            updateMixerUI();
+                        }
+                    }
+                });
+            });
+        }
+
+        function updateWordsList() {
+            const listEl = document.getElementById('wordsList');
+            
+            if (state.currentPuzzleWords.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">All ingredients found! Generate a new puzzle.</div>';
+                return;
+            }
+
+            listEl.innerHTML = state.currentPuzzleWords.map(ing => {
+                const found = state.foundWords.includes(ing);
+                return `<div class="word-item ${found ? 'found' : ''}">${ing}</div>`;
+            }).join('');
+
+            document.getElementById('progressText').textContent = 
+                `Total Found: ${state.unlockedIngredients.length} / ${INGREDIENTS_DATA.length}`;
+        }
+
+        // ========== MIXER FUNCTIONS ==========
+        function toggleIngredient(ingredient) {
+            if (!state.unlockedIngredients.includes(ingredient)) return;
+
+            const idx = state.selectedIngredients.indexOf(ingredient);
+            
+            if (idx > -1) {
+                state.selectedIngredients.splice(idx, 1);
+            } else {
+                if (state.selectedIngredients.length < 3) {
+                    state.selectedIngredients.push(ingredient);
+                }
+            }
+            
+            updateMixerUI();
+        }
+
+        function mixPotion() {
+            if (state.selectedIngredients.length === 0) return;
+
+            const potion = generatePotion(state.selectedIngredients);
+            const exists = state.potions.some(p => p.key === potion.key);
+            
+            if (!exists) {
+                state.potions.unshift(potion);
+                saveProgress(); // Save when potion created
+            }
+
+            state.selectedIngredients = [];
+            updateMixerUI();
+        }
+
+        function renderPotions() {
+            const list = document.getElementById('potionList');
+            const countEl = document.getElementById('potionCount');
+            
+            countEl.textContent = `(${getDiscoveredCount()} / ${TOTAL_POSSIBLE_POTIONS})`;
+            
+            if (state.potions.length === 0) {
+                list.innerHTML = '<div class="empty-state">No potions brewed yet. Unlock ingredients and mix!</div>';
+                return;
+            }
+
+            list.innerHTML = state.potions.map(potion => `
+                <div class="potion-card">
+                    <div class="potion-name">${potion.name}</div>
+                    <div class="potion-desc">${potion.description}</div>
+                    <div class="potion-ingredients">Ingredients: ${potion.ingredients.join(', ')}</div>
+                    <div class="debug-key">Key: ${potion.key}</div>
+                </div>
+            `).join('');
+        }
+
+        function updateMixerUI() {
+            const grid = document.getElementById('ingredientsGrid');
+            const mixBtn = document.getElementById('mixButton');
+            
+            grid.innerHTML = INGREDIENTS_DATA.map(ing => {
+                const unlocked = state.unlockedIngredients.includes(ing);
+                const selected = state.selectedIngredients.includes(ing);
+                const disabled = !selected && state.selectedIngredients.length >= 3;
+                const alreadyMade = unlocked && !selected && isPotionAlreadyMade(ing);
+                
+                return `
+                    <button 
+                        class="ingredient-btn ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''} ${!unlocked ? 'locked' : ''} ${alreadyMade ? 'already-made' : ''}"
+                        onclick="toggleIngredient('${ing}')"
+                        ${disabled || !unlocked ? 'disabled' : ''}
+                    >
+                        ${unlocked ? ing : ''}
+                    </button>
+                `;
+            }).join('');
+
+            mixBtn.disabled = state.selectedIngredients.length === 0;
+            renderPotions();
+        }
+
+        // ========== EXPORT FUNCTIONS ==========
+        function loseState() {
+            return {
+                ingredients: INGREDIENTS_DATA,
+                unlockedIngredients: state.unlockedIngredients,
+                potions: state.potions,
+                timestamp: new Date().toISOString(),
+                version: '1.0'
+            };
+        }
+
+        function caesarCipher(text, shift) {
+            return text.split('').map(char => {
+                const code = char.charCodeAt(0);
+                if (code >= 65 && code <= 90) {
+                    return String.fromCharCode(((code - 65 + shift) % 26) + 65);
+                } else if (code >= 97 && code <= 122) {
+                    return String.fromCharCode(((code - 97 + shift) % 26) + 97);
+                }
+                return char;
+            }).join('');
+        }
+
+        function xorEncrypt(text, key) {
+            return btoa(text.split('').map((char, i) => 
+                String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
+            ).join(''));
+        }
+
+        function exportEncrypted() {
+            const stateData = loseState();
+            const json = JSON.stringify(stateData);
+            const encrypted = xorEncrypt(caesarCipher(json, 13), 'witchypotion');
+            
+            const blob = new Blob([encrypted], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'potions_encrypted.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportDummy() {
+            const stateData = loseState();
+            const json = JSON.stringify(stateData, null, 2);
+            
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'potions_plain.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ========== INITIALIZATION ==========
+        document.getElementById('mixButton').addEventListener('click', mixPotion);
+
+        // Load data and start game
+        loadData();
+    </script>
+</body>
+</html>

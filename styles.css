@@ -1,0 +1,440 @@
+* {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #2d1b3d 0%, #1a0f26 100%);
+            color: #e8dcc4;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #f4e4c1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            text-align: center;
+            font-style: italic;
+            margin-bottom: 30px;
+            color: #d4b896;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .tab-btn {
+            padding: 12px 30px;
+            background: #5d4a2f;
+            border: 2px solid #8b6f47;
+            border-radius: 10px 10px 0 0;
+            color: #f4e4c1;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            background: #6d5a3f;
+        }
+
+        .tab-btn.active {
+            background: #8b6f47;
+            border-bottom: 2px solid #8b6f47;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+       .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+        }
+
+
+        .panel {
+            background: linear-gradient(to bottom, #f4e4c1 0%, #e8dcc4 100%);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            border: 3px solid #8b6f47;
+        }
+
+        .panel h2 {
+            color: #3d2817;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 2px solid #8b6f47;
+            padding-bottom: 10px;
+        }
+
+        /* Word Search Styles */
+        .word-search-layout {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr); /* same as mobile */
+            gap: 2px;
+            background: #5d4a2f;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+
+        .grid-cell {
+            aspect-ratio: 1;
+            background: #fff9f0;
+            border: 1px solid #c4a576;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.25em;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            color: #3d2817;
+        }
+
+        .grid-cell:hover {
+            background: #f0e6d2;
+        }
+
+        .grid-cell.selected {
+            background: #8b6f47;
+            color: #f4e4c1;
+        }
+
+        .grid-cell.found {
+            background: #6a9d5a;
+            color: #fff;
+        }
+
+        .words-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .word-item {
+            padding: 12px;
+            background: #fff9f0;
+            border: 2px solid #c4a576;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.95em;
+            color: #3d2817;
+        }
+
+        .word-item.found {
+            background: #6a9d5a;
+            color: #fff;
+            border-color: #4a7d3a;
+            text-decoration: line-through;
+        }
+
+        .progress-bar {
+            background: #5d4a2f;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #f4e4c1;
+            font-size: 1.1em;
+        }
+
+        .regenerate-btn {
+            width: 100%;
+            padding: 12px;
+            background: #8b6f47;
+            border: none;
+            border-radius: 8px;
+            color: #f4e4c1;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 15px;
+        }
+
+        .regenerate-btn:hover {
+            background: #6d5a3f;
+        }
+
+        /* Mixer Styles */
+        .ingredients-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .ingredient-btn {
+            background: #fff9f0;
+            border: 2px solid #c4a576;
+            border-radius: 8px;
+            padding: 12px 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            color: #3d2817;
+            text-align: center;
+        }
+
+        .ingredient-btn:hover:not(.locked) {
+            background: #f0e6d2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .ingredient-btn.selected {
+            background: #8b6f47;
+            color: #f4e4c1;
+            border-color: #5d4a2f;
+            font-weight: bold;
+        }
+
+        .ingredient-btn.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .ingredient-btn.locked {
+            opacity: 0.3;
+            cursor: not-allowed;
+            position: relative;
+        }
+
+        .ingredient-btn.locked::before {
+            content: '🔒';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5em;
+        }
+
+        .mix-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(to bottom, #8b6f47 0%, #5d4a2f 100%);
+            border: none;
+            border-radius: 10px;
+            color: #f4e4c1;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .mix-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+
+        .mix-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .potion-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .potion-card {
+            background: #fff9f0;
+            border: 2px solid #c4a576;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .potion-name {
+            color: #5d4a2f;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .potion-desc {
+            color: #6d5a3e;
+            font-size: 0.95em;
+            line-height: 1.4;
+            margin-bottom: 10px;
+        }
+
+        .potion-ingredients {
+            font-size: 0.85em;
+            color: #8b6f47;
+            font-style: italic;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .export-btn {
+            flex: 1;
+            padding: 10px;
+            background: #5d4a2f;
+            border: none;
+            border-radius: 8px;
+            color: #f4e4c1;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .export-btn:hover {
+            background: #3d2817;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #8b6f47;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+
+        .debug-key {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f0e6d2;
+            border-radius: 5px;
+            font-size: 0.8em;
+            color: #5d4a2f;
+            font-family: monospace;
+        }
+        .ingredient-btn.already-made {
+            opacity: 0.5;
+            background: #e8dcc4;
+        }
+
+        /* Tower Styles - Add these to your styles.css */
+
+.tower-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.tower-panel {
+    text-align: center;
+}
+
+.tower-viewport {
+    background: #2d1b3d;
+    border: 3px solid #5d4a2f;
+    border-radius: 10px;
+    padding: 10px;
+    margin: 20px auto;
+    display: inline-block;
+}
+
+#towerCanvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.tower-stats {
+    background: #fff9f0;
+    border: 2px solid #c4a576;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.stat-item {
+    margin: 12px 0;
+    font-size: 1.1em;
+    color: #3d2817;
+}
+
+.stat-label {
+    font-weight: bold;
+    color: #5d4a2f;
+}
+
+#buildSpeed,
+#currentHeight,
+#totalBuilt {
+    color: #8b6f47;
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.potion-count {
+    font-size: 0.8em;
+    color: #8b6f47;
+}
+
+.ingredient-btn.already-made {
+    opacity: 0.5;
+    background: #e8dcc4;
+}
+
+        @media (max-width: 1200px) {
+            .word-search-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .grid-container {
+                grid-template-columns: repeat(20, 1fr);
+            }
+
+            .grid-cell {
+                font-size: 0.65em;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .grid-container {
+                grid-template-columns: repeat(15, 1fr);
+                gap: 1px;
+            }
+
+            .grid-cell {
+                font-size: 1em;
+            }
+
+            .ingredients-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+        }
