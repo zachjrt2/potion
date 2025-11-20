@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔮 Witchy Potion Mixer 🔮</h1>
+        <h1>The Witches Tower</h1>
         <p class="subtitle">Find ingredients in the word search, then brew mystical potions</p>
 
         <div class="nav-tabs">
@@ -57,21 +57,36 @@
         </div>
     </div>
 
-    <div id="towerPage" class="page">
+<div id="towerPage" class="page">
     <div class="tower-container">
         <canvas id="towerCanvas" class="tower-canvas" width="300" height="800"></canvas>
     </div>
     <div class="tower-stats">
         <div><span class="stat-label">Tower Height:</span> <span class="stat-value" id="towerHeight">0</span> <span class="stat-label">rows</span></div>
         <div><span class="stat-label">Total Blocks:</span> <span class="stat-value" id="totalBlocks">0</span></div>
+        <div><span class="stat-label">Spendable Blocks:</span> <span class="stat-value" id="spendableBlocks">0</span></div>
         <div><span class="stat-label">Towers Completed:</span> <span class="stat-value" id="towersCompleted">0</span></div>
         <div><span class="stat-label">Build Speed:</span> <span class="stat-value" id="buildSpeed">0</span> <span class="stat-label">blocks/sec</span></div>
+    </div>
+    
+    <div class="upgrade-section">
+        <h3>🧙 Upgrades</h3>
+        <div class="upgrade-card">
+            <div class="upgrade-info">
+                <div><span class="stat-label">Assistants:</span> <span class="stat-value" id="assistantCount">0</span></div>
+                <div><span class="stat-label">Potions Found by Assistants:</span> <span class="stat-value" id="potionsFromAssistants">0</span></div>
+                <div><span class="stat-label">Undiscovered Potions:</span> <span class="stat-value" id="undiscoveredCount">0</span></div>
+            </div>
+            <button class="upgrade-btn" id="buyAssistantBtn" onclick="buyAssistant()">
+                Hire Assistant (100 blocks)
+            </button>
+            <div class="upgrade-desc">Each assistant discovers 1 potion every 5 seconds from your unlocked ingredients.</div>
+        </div>
     </div>
 </div>
 
     <script>
-      // ========== TOWER SYSTEM ==========
-// ========== TOWER SYSTEM ==========
+  // ========== TOWER SYSTEM ==========
 const TOWER_CONFIG = {
     blockSize: 10,
     towerWidth: 30,        // blocks
@@ -82,11 +97,15 @@ const TOWER_CONFIG = {
 
 let towerState = {
     totalBlocks: 0,        // Total blocks ever placed (can be huge)
+    spendableBlocks: 0,    // Blocks available to spend on upgrades
     currentRowProgress: 0, // How many blocks in the current row (0-29)
     visibleRows: [],       // Array of rows currently on screen
     lastUpdateTime: null,
     accumulatedBlocks: 0,  // Fractional blocks accumulated
-    towersCompleted: 0     // How many times tower has been cleared
+    towersCompleted: 0,    // How many times tower has been cleared
+    assistants: 0,         // Number of potion-finding assistants
+    assistantAccumulator: 0, // Time accumulator for assistant work
+    potionsFromAssistants: 0 // Track how many potions assistants found
 };
 
 let towerCanvas, towerCtx;
@@ -117,6 +136,9 @@ function initTower() {
     if (document.getElementById('towerHeight')) {
         updateTowerStats();
     }
+    if (document.getElementById('buyAssistantBtn')) {
+        updateUpgradeUI();
+    }
 }
 
 function loadTowerState() {
@@ -126,10 +148,14 @@ function loadTowerState() {
             const data = JSON.parse(saved);
             if (data.tower) {
                 towerState.totalBlocks = data.tower.totalBlocks || 0;
+                towerState.spendableBlocks = data.tower.spendableBlocks || 0;
                 towerState.currentRowProgress = data.tower.currentRowProgress || 0;
                 towerState.visibleRows = data.tower.visibleRows || [];
                 towerState.accumulatedBlocks = data.tower.accumulatedBlocks || 0;
                 towerState.towersCompleted = data.tower.towersCompleted || 0;
+                towerState.assistants = data.tower.assistants || 0;
+                towerState.assistantAccumulator = data.tower.assistantAccumulator || 0;
+                towerState.potionsFromAssistants = data.tower.potionsFromAssistants || 0;
             }
         }
     } catch (e) {
@@ -144,10 +170,14 @@ function saveTowerState() {
         
         data.tower = {
             totalBlocks: towerState.totalBlocks,
+            spendableBlocks: towerState.spendableBlocks,
             currentRowProgress: towerState.currentRowProgress,
             visibleRows: towerState.visibleRows,
             accumulatedBlocks: towerState.accumulatedBlocks,
-            towersCompleted: towerState.towersCompleted
+            towersCompleted: towerState.towersCompleted,
+            assistants: towerState.assistants,
+            assistantAccumulator: towerState.assistantAccumulator,
+            potionsFromAssistants: towerState.potionsFromAssistants
         };
         
         // Preserve other save data
@@ -168,6 +198,121 @@ function getBuildSpeed() {
     return potionCount * TOWER_CONFIG.speedPerPotion;
 }
 
+// ========== ASSISTANT SYSTEM ==========
+const ASSISTANT_CONFIG = {
+    baseCost: 100,
+    costMultiplier: 10,
+    discoveryInterval: 5 // seconds per potion per assistant
+};
+
+function getAssistantCost() {
+    return ASSISTANT_CONFIG.baseCost * Math.pow(ASSISTANT_CONFIG.costMultiplier, towerState.assistants);
+}
+
+function canBuyAssistant() {
+    return towerState.spendableBlocks >= getAssistantCost();
+}
+
+function buyAssistant() {
+    const cost = getAssistantCost();
+    if (towerState.spendableBlocks >= cost) {
+        towerState.spendableBlocks -= cost;
+        towerState.assistants++;
+        updateTowerStats();
+        updateUpgradeUI();
+        saveTowerState();
+    }
+}
+
+function getUndiscoveredPotions() {
+    // Get all possible combinations of 3 unlocked ingredients
+    const unlocked = state.unlockedIngredients || [];
+    if (unlocked.length < 3) return [];
+    
+    const undiscovered = [];
+    
+    for (let i = 0; i < unlocked.length - 2; i++) {
+        for (let j = i + 1; j < unlocked.length - 1; j++) {
+            for (let k = j + 1; k < unlocked.length; k++) {
+                const ingredients = [unlocked[i], unlocked[j], unlocked[k]];
+                const key = generatePotionKey(ingredients);
+                
+                // Check if this potion hasn't been made yet
+                const alreadyMade = state.potions.some(p => p.key === key);
+                if (!alreadyMade) {
+                    undiscovered.push(ingredients);
+                }
+            }
+        }
+    }
+    
+    return undiscovered;
+}
+
+function assistantDiscoverPotion() {
+    const undiscovered = getUndiscoveredPotions();
+    if (undiscovered.length === 0) return false;
+    
+    // Pick a random undiscovered potion
+    const randomIndex = Math.floor(Math.random() * undiscovered.length);
+    const ingredients = undiscovered[randomIndex];
+    
+    const potion = generatePotion(ingredients);
+    state.potions.unshift(potion);
+    towerState.potionsFromAssistants++;
+    
+    saveProgress(); // Save the new potion
+    renderPotions();
+    
+    return true;
+}
+
+function processAssistants(deltaTime) {
+    if (towerState.assistants <= 0) return;
+    
+    const undiscovered = getUndiscoveredPotions();
+    if (undiscovered.length === 0) return; // Nothing left to discover
+    
+    // Each assistant finds 1 potion every 5 seconds
+    towerState.assistantAccumulator += deltaTime * towerState.assistants;
+    
+    while (towerState.assistantAccumulator >= ASSISTANT_CONFIG.discoveryInterval) {
+        towerState.assistantAccumulator -= ASSISTANT_CONFIG.discoveryInterval;
+        
+        if (!assistantDiscoverPotion()) {
+            // No more potions to discover
+            towerState.assistantAccumulator = 0;
+            break;
+        }
+    }
+}
+
+function updateUpgradeUI() {
+    const upgradeBtn = document.getElementById('buyAssistantBtn');
+    const assistantCountEl = document.getElementById('assistantCount');
+    const potionsFromAssistantsEl = document.getElementById('potionsFromAssistants');
+    const undiscoveredCountEl = document.getElementById('undiscoveredCount');
+    
+    if (!upgradeBtn || !assistantCountEl || !potionsFromAssistantsEl || !undiscoveredCountEl) return;
+    
+    const cost = getAssistantCost();
+    const canBuy = canBuyAssistant();
+    const undiscovered = getUndiscoveredPotions();
+    
+    assistantCountEl.textContent = towerState.assistants;
+    potionsFromAssistantsEl.textContent = formatLargeNumber(towerState.potionsFromAssistants);
+    undiscoveredCountEl.textContent = formatLargeNumber(undiscovered.length);
+    
+    if (undiscovered.length === 0) {
+        upgradeBtn.textContent = 'All Potions Discovered!';
+        upgradeBtn.disabled = true;
+    } else {
+        upgradeBtn.textContent = `Hire Assistant (${formatLargeNumber(cost)} blocks)`;
+        upgradeBtn.disabled = !canBuy;
+    }
+}
+
+// ========== TOWER LOOP ==========
 function towerLoop(currentTime) {
     if (!towerState.lastUpdateTime) {
         towerState.lastUpdateTime = currentTime;
@@ -189,6 +334,9 @@ function towerLoop(currentTime) {
         }
     }
     
+    // Process assistants
+    processAssistants(deltaTime);
+    
     // Periodic save
     if (Date.now() - lastTowerSave > TOWER_CONFIG.saveInterval) {
         saveTowerState();
@@ -199,6 +347,7 @@ function towerLoop(currentTime) {
     if (document.getElementById('towerPage').classList.contains('active')) {
         renderTower();
         updateTowerStats();
+        updateUpgradeUI();
     }
     
     towerAnimationId = requestAnimationFrame(towerLoop);
@@ -206,6 +355,7 @@ function towerLoop(currentTime) {
 
 function placeBlock() {
     towerState.totalBlocks++;
+    towerState.spendableBlocks++;
     
     // Ensure we have a current row
     if (towerState.visibleRows.length === 0) {
@@ -290,6 +440,7 @@ function formatLargeNumber(num) {
 function updateTowerStats() {
     const heightEl = document.getElementById('towerHeight');
     const blocksEl = document.getElementById('totalBlocks');
+    const spendableEl = document.getElementById('spendableBlocks');
     const speedEl = document.getElementById('buildSpeed');
     const towersEl = document.getElementById('towersCompleted');
     
@@ -300,12 +451,13 @@ function updateTowerStats() {
     
     heightEl.textContent = formatLargeNumber(completedRows);
     blocksEl.textContent = formatLargeNumber(towerState.totalBlocks);
+    if (spendableEl) spendableEl.textContent = formatLargeNumber(towerState.spendableBlocks);
     speedEl.textContent = getBuildSpeed().toFixed(1);
     towersEl.textContent = formatLargeNumber(towerState.towersCompleted || 0);
 }
 
 // Update the switchTab function to handle tower tab
-const originalSwitchTab = switchTab;
+const originalSwitchTab = typeof switchTab === 'function' ? switchTab : null;
 switchTab = function(tab) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -321,23 +473,30 @@ switchTab = function(tab) {
         document.querySelectorAll('.tab-btn')[2].classList.add('active');
         renderTower();
         updateTowerStats();
+        updateUpgradeUI();
     }
 };
 
 // Update loadProgress to also load tower state
-const originalLoadProgress = loadProgress;
-loadProgress = function() {
-    const result = originalLoadProgress();
-    loadTowerState();
-    return result;
-};
+const originalLoadProgress = typeof loadProgress === 'function' ? loadProgress : null;
+if (originalLoadProgress) {
+    const _origLoadProgress = loadProgress;
+    loadProgress = function() {
+        const result = _origLoadProgress();
+        loadTowerState();
+        return result;
+    };
+}
 
-// Initialize tower after game loads
-const originalInitializeGame = initializeGame;
-initializeGame = function() {
-    originalInitializeGame();
-    initTower();
-};
+// Update initializeGame to init tower
+const originalInitializeGame = typeof initializeGame === 'function' ? initializeGame : null;
+if (originalInitializeGame) {
+    const _origInitializeGame = initializeGame;
+    initializeGame = function() {
+        _origInitializeGame();
+        initTower();
+    };
+}
 
 // Save tower state when page unloads
 window.addEventListener('beforeunload', () => {
