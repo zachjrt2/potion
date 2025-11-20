@@ -57,7 +57,292 @@
         </div>
     </div>
 
+    <div id="towerPage" class="page">
+    <div class="tower-container">
+        <canvas id="towerCanvas" class="tower-canvas" width="300" height="800"></canvas>
+    </div>
+    <div class="tower-stats">
+        <div><span class="stat-label">Tower Height:</span> <span class="stat-value" id="towerHeight">0</span> <span class="stat-label">rows</span></div>
+        <div><span class="stat-label">Total Blocks:</span> <span class="stat-value" id="totalBlocks">0</span></div>
+        <div><span class="stat-label">Towers Completed:</span> <span class="stat-value" id="towersCompleted">0</span></div>
+        <div><span class="stat-label">Build Speed:</span> <span class="stat-value" id="buildSpeed">0</span> <span class="stat-label">blocks/sec</span></div>
+    </div>
+</div>
+
     <script>
+      // ========== TOWER SYSTEM ==========
+// ========== TOWER SYSTEM ==========
+const TOWER_CONFIG = {
+    blockSize: 10,
+    towerWidth: 30,        // blocks
+    viewportHeight: 80,    // blocks visible
+    saveInterval: 30000,   // 30 seconds
+    speedPerPotion: 1.1
+};
+
+let towerState = {
+    totalBlocks: 0,        // Total blocks ever placed (can be huge)
+    currentRowProgress: 0, // How many blocks in the current row (0-29)
+    visibleRows: [],       // Array of rows currently on screen
+    lastUpdateTime: null,
+    accumulatedBlocks: 0,  // Fractional blocks accumulated
+    towersCompleted: 0     // How many times tower has been cleared
+};
+
+let towerCanvas, towerCtx;
+let towerAnimationId = null;
+let lastTowerSave = Date.now();
+
+// Initialize tower
+function initTower() {
+    towerCanvas = document.getElementById('towerCanvas');
+    if (!towerCanvas) {
+        console.warn('Tower canvas not found - make sure #towerPage HTML is added');
+        return;
+    }
+    
+    towerCtx = towerCanvas.getContext('2d');
+    towerCanvas.width = TOWER_CONFIG.towerWidth * TOWER_CONFIG.blockSize;
+    towerCanvas.height = TOWER_CONFIG.viewportHeight * TOWER_CONFIG.blockSize;
+    
+    // Load tower state from save
+    loadTowerState();
+    
+    // Start the tower loop (runs in background)
+    towerState.lastUpdateTime = performance.now();
+    requestAnimationFrame(towerLoop);
+    
+    // Initial render only if elements exist
+    renderTower();
+    if (document.getElementById('towerHeight')) {
+        updateTowerStats();
+    }
+}
+
+function loadTowerState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const data = JSON.parse(saved);
+            if (data.tower) {
+                towerState.totalBlocks = data.tower.totalBlocks || 0;
+                towerState.currentRowProgress = data.tower.currentRowProgress || 0;
+                towerState.visibleRows = data.tower.visibleRows || [];
+                towerState.accumulatedBlocks = data.tower.accumulatedBlocks || 0;
+                towerState.towersCompleted = data.tower.towersCompleted || 0;
+            }
+        }
+    } catch (e) {
+        console.error('Error loading tower state:', e);
+    }
+}
+
+function saveTowerState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        let data = saved ? JSON.parse(saved) : {};
+        
+        data.tower = {
+            totalBlocks: towerState.totalBlocks,
+            currentRowProgress: towerState.currentRowProgress,
+            visibleRows: towerState.visibleRows,
+            accumulatedBlocks: towerState.accumulatedBlocks,
+            towersCompleted: towerState.towersCompleted
+        };
+        
+        // Preserve other save data
+        data.unlockedIngredients = state.unlockedIngredients;
+        data.foundWords = state.foundWords;
+        data.potions = state.potions;
+        data.version = '1.1';
+        data.savedAt = new Date().toISOString();
+        
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.error('Error saving tower state:', e);
+    }
+}
+
+function getBuildSpeed() {
+    const potionCount = state.potions ? state.potions.length : 0;
+    return potionCount * TOWER_CONFIG.speedPerPotion;
+}
+
+function towerLoop(currentTime) {
+    if (!towerState.lastUpdateTime) {
+        towerState.lastUpdateTime = currentTime;
+    }
+    
+    const deltaTime = (currentTime - towerState.lastUpdateTime) / 1000; // seconds
+    towerState.lastUpdateTime = currentTime;
+    
+    const speed = getBuildSpeed();
+    
+    if (speed > 0) {
+        // Accumulate fractional blocks
+        towerState.accumulatedBlocks += speed * deltaTime;
+        
+        // Place whole blocks
+        while (towerState.accumulatedBlocks >= 1) {
+            placeBlock();
+            towerState.accumulatedBlocks -= 1;
+        }
+    }
+    
+    // Periodic save
+    if (Date.now() - lastTowerSave > TOWER_CONFIG.saveInterval) {
+        saveTowerState();
+        lastTowerSave = Date.now();
+    }
+    
+    // Update display if tower tab is visible
+    if (document.getElementById('towerPage').classList.contains('active')) {
+        renderTower();
+        updateTowerStats();
+    }
+    
+    towerAnimationId = requestAnimationFrame(towerLoop);
+}
+
+function placeBlock() {
+    towerState.totalBlocks++;
+    
+    // Ensure we have a current row
+    if (towerState.visibleRows.length === 0) {
+        towerState.visibleRows.push(new Array(TOWER_CONFIG.towerWidth).fill(false));
+    }
+    
+    // Get current row (top of tower)
+    let currentRow = towerState.visibleRows[towerState.visibleRows.length - 1];
+    
+    // Place block at current position
+    currentRow[towerState.currentRowProgress] = true;
+    towerState.currentRowProgress++;
+    
+    // Check if row is complete
+    if (towerState.currentRowProgress >= TOWER_CONFIG.towerWidth) {
+        towerState.currentRowProgress = 0;
+        
+        // Add new row
+        towerState.visibleRows.push(new Array(TOWER_CONFIG.towerWidth).fill(false));
+        
+        // Clear tower visually when it fills up (but keep total count)
+        if (towerState.visibleRows.length > TOWER_CONFIG.viewportHeight) {
+            towerState.visibleRows = [];
+            towerState.towersCompleted = (towerState.towersCompleted || 0) + 1;
+        }
+    }
+}
+
+function renderTower() {
+    if (!towerCtx) return;
+    
+    const ctx = towerCtx;
+    const blockSize = TOWER_CONFIG.blockSize;
+    
+    // Clear canvas with gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 0, towerCanvas.height);
+    gradient.addColorStop(0, '#0d0d1a');
+    gradient.addColorStop(1, '#1a1a2e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, towerCanvas.width, towerCanvas.height);
+    
+    // Draw blocks from bottom to top
+    const rowCount = towerState.visibleRows.length;
+    
+    for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+        const row = towerState.visibleRows[rowIdx];
+        // Draw from bottom of canvas
+        const y = towerCanvas.height - (rowIdx + 1) * blockSize;
+        
+        for (let colIdx = 0; colIdx < row.length; colIdx++) {
+            if (row[colIdx]) {
+                const x = colIdx * blockSize;
+                
+                // Block fill
+                ctx.fillStyle = '#6a6a8a';
+                ctx.fillRect(x, y, blockSize - 1, blockSize - 1);
+                
+                // Subtle highlight
+                ctx.fillStyle = '#8a8aaa';
+                ctx.fillRect(x, y, blockSize - 1, 2);
+                ctx.fillRect(x, y, 2, blockSize - 1);
+                
+                // Subtle shadow
+                ctx.fillStyle = '#4a4a6a';
+                ctx.fillRect(x + blockSize - 3, y + 2, 2, blockSize - 3);
+                ctx.fillRect(x + 2, y + blockSize - 3, blockSize - 3, 2);
+            }
+        }
+    }
+}
+
+function formatLargeNumber(num) {
+    if (num < 1000000) {
+        return num.toLocaleString();
+    }
+    
+    const exp = Math.floor(Math.log10(num));
+    const mantissa = num / Math.pow(10, exp);
+    return `${mantissa.toFixed(2)} × 10^${exp}`;
+}
+
+function updateTowerStats() {
+    const heightEl = document.getElementById('towerHeight');
+    const blocksEl = document.getElementById('totalBlocks');
+    const speedEl = document.getElementById('buildSpeed');
+    const towersEl = document.getElementById('towersCompleted');
+    
+    if (!heightEl) return;
+    
+    // Calculate total rows (including partial)
+    const completedRows = Math.floor(towerState.totalBlocks / TOWER_CONFIG.towerWidth);
+    
+    heightEl.textContent = formatLargeNumber(completedRows);
+    blocksEl.textContent = formatLargeNumber(towerState.totalBlocks);
+    speedEl.textContent = getBuildSpeed().toFixed(1);
+    towersEl.textContent = formatLargeNumber(towerState.towersCompleted || 0);
+}
+
+// Update the switchTab function to handle tower tab
+const originalSwitchTab = switchTab;
+switchTab = function(tab) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    
+    if (tab === 'search') {
+        document.getElementById('searchPage').classList.add('active');
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    } else if (tab === 'mixer') {
+        document.getElementById('mixerPage').classList.add('active');
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    } else if (tab === 'tower') {
+        document.getElementById('towerPage').classList.add('active');
+        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        renderTower();
+        updateTowerStats();
+    }
+};
+
+// Update loadProgress to also load tower state
+const originalLoadProgress = loadProgress;
+loadProgress = function() {
+    const result = originalLoadProgress();
+    loadTowerState();
+    return result;
+};
+
+// Initialize tower after game loads
+const originalInitializeGame = initializeGame;
+initializeGame = function() {
+    originalInitializeGame();
+    initTower();
+};
+
+// Save tower state when page unloads
+window.addEventListener('beforeunload', () => {
+    saveTowerState();
+});
         // ========== GLOBAL DATA ==========
         let INGREDIENTS_DATA = [];
         let POTIONS_DATA = {};

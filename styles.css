@@ -339,68 +339,51 @@
             background: #e8dcc4;
         }
 
-        /* Tower Styles - Add these to your styles.css */
+        #towerPage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
 
 .tower-container {
-    max-width: 600px;
-    margin: 0 auto;
+    background: #1a1a2e;
+    border: 2px solid #4a4a6a;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
 }
 
-.tower-panel {
-    text-align: center;
-}
-
-.tower-viewport {
-    background: #2d1b3d;
-    border: 3px solid #5d4a2f;
-    border-radius: 10px;
-    padding: 10px;
-    margin: 20px auto;
-    display: inline-block;
-}
-
-#towerCanvas {
+.tower-canvas {
     display: block;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
+    background: linear-gradient(to bottom, #0d0d1a 0%, #1a1a2e 100%);
 }
 
 .tower-stats {
-    background: #fff9f0;
-    border: 2px solid #c4a576;
-    border-radius: 10px;
-    padding: 20px;
-    margin-top: 20px;
-}
-
-.stat-item {
-    margin: 12px 0;
-    font-size: 1.1em;
-    color: #3d2817;
-}
-
-.stat-label {
-    font-weight: bold;
-    color: #5d4a2f;
-}
-
-#buildSpeed,
-#currentHeight,
-#totalBuilt {
-    color: #8b6f47;
-    font-weight: bold;
+    margin-top: 15px;
+    padding: 15px 25px;
+    background: rgba(74, 74, 106, 0.3);
+    border-radius: 8px;
+    text-align: center;
+    color: #c9c9e0;
     font-family: monospace;
 }
 
-.potion-count {
-    font-size: 0.8em;
-    color: #8b6f47;
+.tower-stats div {
+    margin: 5px 0;
+    font-size: 14px;
 }
 
-.ingredient-btn.already-made {
-    opacity: 0.5;
-    background: #e8dcc4;
+.tower-stats .stat-label {
+    color: #8888aa;
 }
+
+.tower-stats .stat-value {
+    color: #e0e0ff;
+    font-weight: bold;
+}
+
+        
 
         @media (max-width: 1200px) {
             .word-search-layout {
