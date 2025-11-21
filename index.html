@@ -26,7 +26,7 @@
                     </div>
                     <div class="grid-container" id="wordGrid"></div>
                     <button class="regenerate-btn" onclick="regenerateGrid()">Generate New Puzzle</button>
-                    <button class="regenerate-btn" onclick="clearProgress()" style="background: #8b4444; margin-top: 10px;">Clear All Progress</button>
+                    <!-- <button class="regenerate-btn" onclick="clearProgress()" style="background: #8b4444; margin-top: 10px;">Clear All Progress</button> -->
                 </div>
                 <div class="panel">
                     <h2>Current Puzzle</h2>
@@ -568,15 +568,38 @@
         const STORAGE_KEY = 'witchyPotionMixer_saveData';
 
         function saveProgress() {
-            const saveData = {
-                unlockedIngredients: state.unlockedIngredients,
-                foundWords: state.foundWords,
-                potions: state.potions,
-                version: '1.0',
-                savedAt: new Date().toISOString()
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
-            console.log('Progress saved:', saveData);
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                let data = saved ? JSON.parse(saved) : {};
+                
+                // Update game progress
+                data.unlockedIngredients = state.unlockedIngredients;
+                data.foundWords = state.foundWords;
+                data.potions = state.potions;
+                data.version = '1.1';
+                data.savedAt = new Date().toISOString();
+                
+                // Preserve tower state if it exists
+                if (!data.tower && towerState) {
+                    data.tower = {
+                        totalBlocks: towerState.totalBlocks,
+                        spendableBlocks: towerState.spendableBlocks,
+                        currentRowProgress: towerState.currentRowProgress,
+                        visibleRows: towerState.visibleRows,
+                        accumulatedBlocks: towerState.accumulatedBlocks,
+                        towersCompleted: towerState.towersCompleted,
+                        assistants: towerState.assistants,
+                        assistantAccumulator: towerState.assistantAccumulator,
+                        potionsFromAssistants: towerState.potionsFromAssistants,
+                        hasWon: towerState.hasWon
+                    };
+                }
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                console.log('Progress saved:', data);
+            } catch (e) {
+                console.error('Error saving progress:', e);
+            }
         }
 
         function loadProgress() {
@@ -604,7 +627,9 @@
 
         function clearProgress() {
             if (confirm('Are you sure you want to clear all progress? This cannot be undone.')) {
-                localStorage.removeItem(STORAGE_KEY);
+                // Clear all localStorage data
+                localStorage.clear();
+                // Reload the page to reset everything
                 location.reload();
             }
         }
@@ -697,7 +722,8 @@
         function hashString(str) {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = ((hash << 5) - hash
+                ) + str.charCodeAt(i);
                 hash = hash & hash;
             }
             return Math.abs(hash);
