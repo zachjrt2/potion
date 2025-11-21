@@ -593,11 +593,27 @@ h1 {
 }
 
 #towerPage.active {
+    display: block;
+    padding: 20px;
+    animation: fadeIn 0.4s ease;
+}
+
+.tower-layout {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.tower-main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
-    animation: fadeIn 0.4s ease;
+}
+
+.tower-sidebar {
+    position: sticky;
+    top: 20px;
 }
 
 .tower-container {
@@ -645,8 +661,7 @@ h1 {
 
 /* ==================== UPGRADE SECTION ==================== */
 .upgrade-section {
-    margin-top: 25px;
-    padding: 20px 30px;
+    padding: 20px 25px;
     background: var(--bg-panel);
     border-radius: 12px;
     text-align: center;
@@ -715,6 +730,214 @@ h1 {
     line-height: 1.4;
 }
 
+/* ==================== WIN CELEBRATION ==================== */
+#winOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 10, 18, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.5s ease;
+}
+
+.win-modal {
+    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-dark) 100%);
+    border: 2px solid var(--accent-gold);
+    border-radius: 20px;
+    padding: 40px 50px;
+    text-align: center;
+    box-shadow: 
+        0 0 50px rgba(255, 215, 0, 0.3),
+        0 0 100px rgba(157, 78, 221, 0.2);
+    animation: winPop 0.5s ease;
+    max-width: 90%;
+}
+
+@keyframes winPop {
+    0% { transform: scale(0.5); opacity: 0; }
+    70% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.win-sparkles {
+    font-size: 3em;
+    animation: sparkle 1s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.2) rotate(10deg); }
+}
+
+.win-modal h2 {
+    color: var(--accent-gold);
+    font-size: 2.5em;
+    margin: 20px 0;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+.win-modal p {
+    color: var(--text-bright);
+    font-size: 1.2em;
+    margin: 10px 0;
+}
+
+.win-highlight {
+    color: var(--accent-cyan);
+    font-weight: bold;
+    font-size: 1.3em;
+    text-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+}
+
+.win-subtitle {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.win-stats {
+    background: var(--bg-dark);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 25px 0;
+    border: 1px solid var(--border-glow);
+}
+
+.win-stats div {
+    margin: 8px 0;
+    color: var(--text-dim);
+    font-family: 'Consolas', monospace;
+}
+
+.win-btn {
+    background: linear-gradient(135deg, var(--accent-gold) 0%, #c9a227 100%);
+    border: none;
+    color: #1a1a2e;
+    padding: 15px 40px;
+    border-radius: 10px;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.win-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(255, 215, 0, 0.4);
+}
+
+/* Tower Tab Styles */
+#towerPage.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.tower-container {
+    background: #1a1a2e;
+    border: 2px solid #4a4a6a;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.tower-canvas {
+    display: block;
+    background: linear-gradient(to bottom, #0d0d1a 0%, #1a1a2e 100%);
+}
+
+.tower-stats {
+    margin-top: 15px;
+    padding: 15px 25px;
+    background: rgba(74, 74, 106, 0.3);
+    border-radius: 8px;
+    text-align: center;
+    color: #c9c9e0;
+    font-family: monospace;
+}
+
+.tower-stats div {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.tower-stats .stat-label {
+    color: #8888aa;
+}
+
+.tower-stats .stat-value {
+    color: #e0e0ff;
+    font-weight: bold;
+}
+
+/* Upgrade Section Styles */
+.upgrade-section {
+    margin-top: 20px;
+    padding: 15px 25px;
+    background: rgba(74, 74, 106, 0.3);
+    border-radius: 8px;
+    text-align: center;
+    color: #c9c9e0;
+    width: 300px;
+}
+
+.upgrade-section h3 {
+    margin: 0 0 15px 0;
+    color: #e0e0ff;
+}
+
+.upgrade-card {
+    background: rgba(26, 26, 46, 0.5);
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.upgrade-info {
+    margin-bottom: 12px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.upgrade-info div {
+    margin: 4px 0;
+}
+
+.upgrade-btn {
+    background: linear-gradient(to bottom, #5a5a8a, #4a4a6a);
+    border: 1px solid #6a6a9a;
+    color: #e0e0ff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.upgrade-btn:hover:not(:disabled) {
+    background: linear-gradient(to bottom, #6a6a9a, #5a5a8a);
+    border-color: #8a8aba;
+}
+
+.upgrade-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.upgrade-desc {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #8888aa;
+    font-style: italic;
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1200px) {
     .word-search-layout {
@@ -762,8 +985,27 @@ h1 {
         grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
     }
 
-    .upgrade-section {
+    .tower-layout {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .tower-sidebar {
+        position: static;
         width: 100%;
         max-width: 320px;
+        margin-top: 20px;
+    }
+
+    .upgrade-section {
+        width: 100%;
+    }
+
+    .win-modal {
+        padding: 30px 20px;
+    }
+
+    .win-modal h2 {
+        font-size: 1.8em;
     }
 }

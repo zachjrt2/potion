@@ -78,7 +78,7 @@
                 <div><span class="stat-label">Undiscovered Potions:</span> <span class="stat-value" id="undiscoveredCount">0</span></div>
             </div>
             <button class="upgrade-btn" id="buyAssistantBtn" onclick="buyAssistant()">
-                Hire Assistant (100 blocks)
+                Hire Assistant (<span id="assistantCost">100</span> blocks)
             </button>
             <div class="upgrade-desc">Each assistant discovers 1 potion every 5 seconds from your unlocked ingredients.</div>
         </div>
@@ -86,422 +86,460 @@
 </div>
 
     <script>
-  // ========== TOWER SYSTEM ==========
-const TOWER_CONFIG = {
-    blockSize: 10,
-    towerWidth: 30,        // blocks
-    viewportHeight: 80,    // blocks visible
-    saveInterval: 30000,   // 30 seconds
-    speedPerPotion: 1.1
-};
+      // ========== TOWER SYSTEM ==========
+      const TOWER_CONFIG = {
+          blockSize: 10,
+          towerWidth: 30,        // blocks
+          viewportHeight: 80,    // blocks visible
+          saveInterval: 30000,   // 30 seconds
+          speedPerPotion: 1.1
+      };
 
-let towerState = {
-    totalBlocks: 0,        // Total blocks ever placed (can be huge)
-    spendableBlocks: 0,    // Blocks available to spend on upgrades
-    currentRowProgress: 0, // How many blocks in the current row (0-29)
-    visibleRows: [],       // Array of rows currently on screen
-    lastUpdateTime: null,
-    accumulatedBlocks: 0,  // Fractional blocks accumulated
-    towersCompleted: 0,    // How many times tower has been cleared
-    assistants: 0,         // Number of potion-finding assistants
-    assistantAccumulator: 0, // Time accumulator for assistant work
-    potionsFromAssistants: 0 // Track how many potions assistants found
-};
+      let towerState = {
+          totalBlocks: 0,        // Total blocks ever placed (can be huge)
+          spendableBlocks: 0,    // Blocks available to spend on upgrades
+          currentRowProgress: 0, // How many blocks in the current row (0-29)
+          visibleRows: [],       // Array of rows currently on screen
+          lastUpdateTime: null,
+          accumulatedBlocks: 0,  // Fractional blocks accumulated
+          towersCompleted: 0,    // How many times tower has been cleared
+          assistants: 0,         // Number of potion-finding assistants
+          assistantAccumulator: 0, // Time accumulator for assistant work
+          potionsFromAssistants: 0, // Track how many potions assistants found
+          hasWon: false          // Track if player has hit 1 million blocks
+      };
 
-let towerCanvas, towerCtx;
-let towerAnimationId = null;
-let lastTowerSave = Date.now();
+      let towerCanvas, towerCtx;
+      let towerAnimationId = null;
+      let lastTowerSave = Date.now();
 
-// Initialize tower
-function initTower() {
-    towerCanvas = document.getElementById('towerCanvas');
-    if (!towerCanvas) {
-        console.warn('Tower canvas not found - make sure #towerPage HTML is added');
-        return;
-    }
-    
-    towerCtx = towerCanvas.getContext('2d');
-    towerCanvas.width = TOWER_CONFIG.towerWidth * TOWER_CONFIG.blockSize;
-    towerCanvas.height = TOWER_CONFIG.viewportHeight * TOWER_CONFIG.blockSize;
-    
-    // Load tower state from save
-    loadTowerState();
-    
-    // Start the tower loop (runs in background)
-    towerState.lastUpdateTime = performance.now();
-    requestAnimationFrame(towerLoop);
-    
-    // Initial render only if elements exist
-    renderTower();
-    if (document.getElementById('towerHeight')) {
-        updateTowerStats();
-    }
-    if (document.getElementById('buyAssistantBtn')) {
-        updateUpgradeUI();
-    }
-}
+      // Initialize tower
+      function initTower() {
+          towerCanvas = document.getElementById('towerCanvas');
+          if (!towerCanvas) {
+              console.warn('Tower canvas not found - make sure #towerPage HTML is added');
+              return;
+          }
+          
+          towerCtx = towerCanvas.getContext('2d');
+          towerCanvas.width = TOWER_CONFIG.towerWidth * TOWER_CONFIG.blockSize;
+          towerCanvas.height = TOWER_CONFIG.viewportHeight * TOWER_CONFIG.blockSize;
+          
+          // Load tower state from save
+          loadTowerState();
+          
+          // Start the tower loop (runs in background)
+          towerState.lastUpdateTime = performance.now();
+          requestAnimationFrame(towerLoop);
+          
+          // Initial render only if elements exist
+          renderTower();
+          if (document.getElementById('towerHeight')) {
+              updateTowerStats();
+          }
+          if (document.getElementById('buyAssistantBtn')) {
+              updateUpgradeUI();
+          }
+      }
 
-function loadTowerState() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const data = JSON.parse(saved);
-            if (data.tower) {
-                towerState.totalBlocks = data.tower.totalBlocks || 0;
-                towerState.spendableBlocks = data.tower.spendableBlocks || 0;
-                towerState.currentRowProgress = data.tower.currentRowProgress || 0;
-                towerState.visibleRows = data.tower.visibleRows || [];
-                towerState.accumulatedBlocks = data.tower.accumulatedBlocks || 0;
-                towerState.towersCompleted = data.tower.towersCompleted || 0;
-                towerState.assistants = data.tower.assistants || 0;
-                towerState.assistantAccumulator = data.tower.assistantAccumulator || 0;
-                towerState.potionsFromAssistants = data.tower.potionsFromAssistants || 0;
-            }
-        }
-    } catch (e) {
-        console.error('Error loading tower state:', e);
-    }
-}
+      function loadTowerState() {
+          try {
+              const saved = localStorage.getItem(STORAGE_KEY);
+              if (saved) {
+                  const data = JSON.parse(saved);
+                  if (data.tower) {
+                      towerState.totalBlocks = data.tower.totalBlocks || 0;
+                      towerState.spendableBlocks = data.tower.spendableBlocks || 0;
+                      towerState.currentRowProgress = data.tower.currentRowProgress || 0;
+                      towerState.visibleRows = data.tower.visibleRows || [];
+                      towerState.accumulatedBlocks = data.tower.accumulatedBlocks || 0;
+                      towerState.towersCompleted = data.tower.towersCompleted || 0;
+                      towerState.assistants = data.tower.assistants || 0;
+                      towerState.assistantAccumulator = data.tower.assistantAccumulator || 0;
+                      towerState.potionsFromAssistants = data.tower.potionsFromAssistants || 0;
+                      towerState.hasWon = data.tower.hasWon || false;
+                  }
+              }
+          } catch (e) {
+              console.error('Error loading tower state:', e);
+          }
+      }
 
-function saveTowerState() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        let data = saved ? JSON.parse(saved) : {};
-        
-        data.tower = {
-            totalBlocks: towerState.totalBlocks,
-            spendableBlocks: towerState.spendableBlocks,
-            currentRowProgress: towerState.currentRowProgress,
-            visibleRows: towerState.visibleRows,
-            accumulatedBlocks: towerState.accumulatedBlocks,
-            towersCompleted: towerState.towersCompleted,
-            assistants: towerState.assistants,
-            assistantAccumulator: towerState.assistantAccumulator,
-            potionsFromAssistants: towerState.potionsFromAssistants
-        };
-        
-        // Preserve other save data
-        data.unlockedIngredients = state.unlockedIngredients;
-        data.foundWords = state.foundWords;
-        data.potions = state.potions;
-        data.version = '1.1';
-        data.savedAt = new Date().toISOString();
-        
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-        console.error('Error saving tower state:', e);
-    }
-}
+      function saveTowerState() {
+          try {
+              const saved = localStorage.getItem(STORAGE_KEY);
+              let data = saved ? JSON.parse(saved) : {};
+              
+              data.tower = {
+                  totalBlocks: towerState.totalBlocks,
+                  spendableBlocks: towerState.spendableBlocks,
+                  currentRowProgress: towerState.currentRowProgress,
+                  visibleRows: towerState.visibleRows,
+                  accumulatedBlocks: towerState.accumulatedBlocks,
+                  towersCompleted: towerState.towersCompleted,
+                  assistants: towerState.assistants,
+                  assistantAccumulator: towerState.assistantAccumulator,
+                  potionsFromAssistants: towerState.potionsFromAssistants,
+                  hasWon: towerState.hasWon
+              };
+              
+              // Preserve other save data
+              data.unlockedIngredients = state.unlockedIngredients;
+              data.foundWords = state.foundWords;
+              data.potions = state.potions;
+              data.version = '1.1';
+              data.savedAt = new Date().toISOString();
+              
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          } catch (e) {
+              console.error('Error saving tower state:', e);
+          }
+      }
 
-function getBuildSpeed() {
-    const potionCount = state.potions ? state.potions.length : 0;
-    return potionCount * TOWER_CONFIG.speedPerPotion;
-}
+      function getBuildSpeed() {
+          const potionCount = state.potions ? state.potions.length : 0;
+          return potionCount * TOWER_CONFIG.speedPerPotion;
+      }
 
-// ========== ASSISTANT SYSTEM ==========
-const ASSISTANT_CONFIG = {
-    baseCost: 100,
-    costMultiplier: 10,
-    discoveryInterval: 5 // seconds per potion per assistant
-};
+      // ========== ASSISTANT SYSTEM ==========
+      const ASSISTANT_CONFIG = {
+          baseCost: 1000,
+          costMultiplier: 8,
+          discoveryInterval: 5 // seconds per potion per assistant
+      };
 
-function getAssistantCost() {
-    return ASSISTANT_CONFIG.baseCost * Math.pow(ASSISTANT_CONFIG.costMultiplier, towerState.assistants);
-}
+      function getAssistantCost() {
+          return ASSISTANT_CONFIG.baseCost * Math.pow(ASSISTANT_CONFIG.costMultiplier, towerState.assistants);
+      }
 
-function canBuyAssistant() {
-    return towerState.spendableBlocks >= getAssistantCost();
-}
+      function canBuyAssistant() {
+          return towerState.spendableBlocks >= getAssistantCost();
+      }
 
-function buyAssistant() {
-    const cost = getAssistantCost();
-    if (towerState.spendableBlocks >= cost) {
-        towerState.spendableBlocks -= cost;
-        towerState.assistants++;
-        updateTowerStats();
-        updateUpgradeUI();
-        saveTowerState();
-    }
-}
+      function buyAssistant() {
+          const cost = getAssistantCost();
+          if (towerState.spendableBlocks >= cost) {
+              towerState.spendableBlocks -= cost;
+              towerState.assistants++;
+              updateTowerStats();
+              updateUpgradeUI();
+              saveTowerState();
+          }
+      }
 
-function getUndiscoveredPotions() {
-    // Get all possible combinations of 3 unlocked ingredients
-    const unlocked = state.unlockedIngredients || [];
-    if (unlocked.length < 3) return [];
-    
-    const undiscovered = [];
-    
-    for (let i = 0; i < unlocked.length - 2; i++) {
-        for (let j = i + 1; j < unlocked.length - 1; j++) {
-            for (let k = j + 1; k < unlocked.length; k++) {
-                const ingredients = [unlocked[i], unlocked[j], unlocked[k]];
-                const key = generatePotionKey(ingredients);
-                
-                // Check if this potion hasn't been made yet
-                const alreadyMade = state.potions.some(p => p.key === key);
-                if (!alreadyMade) {
-                    undiscovered.push(ingredients);
-                }
-            }
-        }
-    }
-    
-    return undiscovered;
-}
+      function getUndiscoveredPotions() {
+          // Get all possible combinations of 3 unlocked ingredients
+          const unlocked = state.unlockedIngredients || [];
+          if (unlocked.length < 3) return [];
+          
+          const undiscovered = [];
+          
+          for (let i = 0; i < unlocked.length - 2; i++) {
+              for (let j = i + 1; j < unlocked.length - 1; j++) {
+                  for (let k = j + 1; k < unlocked.length; k++) {
+                      const ingredients = [unlocked[i], unlocked[j], unlocked[k]];
+                      const key = generatePotionKey(ingredients);
+                      
+                      // Check if this potion hasn't been made yet
+                      const alreadyMade = state.potions.some(p => p.key === key);
+                      if (!alreadyMade) {
+                          undiscovered.push(ingredients);
+                      }
+                  }
+              }
+          }
+          
+          return undiscovered;
+      }
 
-function assistantDiscoverPotion() {
-    const undiscovered = getUndiscoveredPotions();
-    if (undiscovered.length === 0) return false;
-    
-    // Pick a random undiscovered potion
-    const randomIndex = Math.floor(Math.random() * undiscovered.length);
-    const ingredients = undiscovered[randomIndex];
-    
-    const potion = generatePotion(ingredients);
-    state.potions.unshift(potion);
-    towerState.potionsFromAssistants++;
-    
-    saveProgress(); // Save the new potion
-    renderPotions();
-    
-    return true;
-}
+      function assistantDiscoverPotion() {
+          const undiscovered = getUndiscoveredPotions();
+          if (undiscovered.length === 0) return false;
+          
+          // Pick a random undiscovered potion
+          const randomIndex = Math.floor(Math.random() * undiscovered.length);
+          const ingredients = undiscovered[randomIndex];
+          
+          const potion = generatePotion(ingredients);
+          state.potions.unshift(potion);
+          towerState.potionsFromAssistants++;
+          
+          saveProgress(); // Save the new potion
+          renderPotions(); // Update the potions list UI
+          
+          return true;
+      }
 
-function processAssistants(deltaTime) {
-    if (towerState.assistants <= 0) return;
-    
-    const undiscovered = getUndiscoveredPotions();
-    if (undiscovered.length === 0) return; // Nothing left to discover
-    
-    // Each assistant finds 1 potion every 5 seconds
-    towerState.assistantAccumulator += deltaTime * towerState.assistants;
-    
-    while (towerState.assistantAccumulator >= ASSISTANT_CONFIG.discoveryInterval) {
-        towerState.assistantAccumulator -= ASSISTANT_CONFIG.discoveryInterval;
-        
-        if (!assistantDiscoverPotion()) {
-            // No more potions to discover
-            towerState.assistantAccumulator = 0;
-            break;
-        }
-    }
-}
+      function processAssistants(deltaTime) {
+          if (towerState.assistants <= 0) return;
+          
+          const undiscovered = getUndiscoveredPotions();
+          if (undiscovered.length === 0) return; // Nothing left to discover
+          
+          // Each assistant finds 1 potion every 5 seconds
+          towerState.assistantAccumulator += deltaTime * towerState.assistants;
+          
+          while (towerState.assistantAccumulator >= ASSISTANT_CONFIG.discoveryInterval) {
+              towerState.assistantAccumulator -= ASSISTANT_CONFIG.discoveryInterval;
+              
+              if (!assistantDiscoverPotion()) {
+                  // No more potions to discover
+                  towerState.assistantAccumulator = 0;
+                  break;
+              }
+          }
+      }
 
-function updateUpgradeUI() {
-    const upgradeBtn = document.getElementById('buyAssistantBtn');
-    const assistantCountEl = document.getElementById('assistantCount');
-    const potionsFromAssistantsEl = document.getElementById('potionsFromAssistants');
-    const undiscoveredCountEl = document.getElementById('undiscoveredCount');
-    
-    if (!upgradeBtn || !assistantCountEl || !potionsFromAssistantsEl || !undiscoveredCountEl) return;
-    
-    const cost = getAssistantCost();
-    const canBuy = canBuyAssistant();
-    const undiscovered = getUndiscoveredPotions();
-    
-    assistantCountEl.textContent = towerState.assistants;
-    potionsFromAssistantsEl.textContent = formatLargeNumber(towerState.potionsFromAssistants);
-    undiscoveredCountEl.textContent = formatLargeNumber(undiscovered.length);
-    
-    if (undiscovered.length === 0) {
-        upgradeBtn.textContent = 'All Potions Discovered!';
-        upgradeBtn.disabled = true;
-    } else {
-        upgradeBtn.textContent = `Hire Assistant (${formatLargeNumber(cost)} blocks)`;
-        upgradeBtn.disabled = !canBuy;
-    }
-}
+      function updateUpgradeUI() {
+          const upgradeBtn = document.getElementById('buyAssistantBtn');
+          const assistantCountEl = document.getElementById('assistantCount');
+          const potionsFromAssistantsEl = document.getElementById('potionsFromAssistants');
+          const undiscoveredCountEl = document.getElementById('undiscoveredCount');
+          
+          if (!upgradeBtn || !assistantCountEl || !potionsFromAssistantsEl || !undiscoveredCountEl) return;
+          
+          const cost = getAssistantCost();
+          const canBuy = canBuyAssistant();
+          const undiscovered = getUndiscoveredPotions();
+          
+          assistantCountEl.textContent = towerState.assistants;
+          potionsFromAssistantsEl.textContent = formatLargeNumber(towerState.potionsFromAssistants);
+          undiscoveredCountEl.textContent = formatLargeNumber(undiscovered.length);
+          
+          if (undiscovered.length === 0) {
+              upgradeBtn.textContent = 'All Potions Discovered!';
+              upgradeBtn.disabled = true;
+          } else {
+              upgradeBtn.textContent = `Hire Assistant (${formatLargeNumber(cost)} blocks)`;
+              upgradeBtn.disabled = !canBuy;
+          }
+      }
 
-// ========== TOWER LOOP ==========
-function towerLoop(currentTime) {
-    if (!towerState.lastUpdateTime) {
-        towerState.lastUpdateTime = currentTime;
-    }
-    
-    const deltaTime = (currentTime - towerState.lastUpdateTime) / 1000; // seconds
-    towerState.lastUpdateTime = currentTime;
-    
-    const speed = getBuildSpeed();
-    
-    if (speed > 0) {
-        // Accumulate fractional blocks
-        towerState.accumulatedBlocks += speed * deltaTime;
-        
-        // Place whole blocks
-        while (towerState.accumulatedBlocks >= 1) {
-            placeBlock();
-            towerState.accumulatedBlocks -= 1;
-        }
-    }
-    
-    // Process assistants
-    processAssistants(deltaTime);
-    
-    // Periodic save
-    if (Date.now() - lastTowerSave > TOWER_CONFIG.saveInterval) {
-        saveTowerState();
-        lastTowerSave = Date.now();
-    }
-    
-    // Update display if tower tab is visible
-    if (document.getElementById('towerPage').classList.contains('active')) {
-        renderTower();
-        updateTowerStats();
-        updateUpgradeUI();
-    }
-    
-    towerAnimationId = requestAnimationFrame(towerLoop);
-}
+      // ========== TOWER LOOP ==========
+      function towerLoop(currentTime) {
+          if (!towerState.lastUpdateTime) {
+              towerState.lastUpdateTime = currentTime;
+          }
+          
+          const deltaTime = (currentTime - towerState.lastUpdateTime) / 1000; // seconds
+          towerState.lastUpdateTime = currentTime;
+          
+          const speed = getBuildSpeed();
+          
+          if (speed > 0) {
+              // Accumulate fractional blocks
+              towerState.accumulatedBlocks += speed * deltaTime;
+              
+              // Place whole blocks
+              while (towerState.accumulatedBlocks >= 1) {
+                  placeBlock();
+                  towerState.accumulatedBlocks -= 1;
+              }
+          }
+          
+          // Process assistants
+          processAssistants(deltaTime);
+          
+          // Periodic save
+          if (Date.now() - lastTowerSave > TOWER_CONFIG.saveInterval) {
+              saveTowerState();
+              lastTowerSave = Date.now();
+          }
+          
+          // Update display if tower tab is visible
+          if (document.getElementById('towerPage').classList.contains('active')) {
+              renderTower();
+              updateTowerStats();
+              updateUpgradeUI();
+          }
+          
+          towerAnimationId = requestAnimationFrame(towerLoop);
+      }
 
-function placeBlock() {
-    towerState.totalBlocks++;
-    towerState.spendableBlocks++;
-    
-    // Ensure we have a current row
-    if (towerState.visibleRows.length === 0) {
-        towerState.visibleRows.push(new Array(TOWER_CONFIG.towerWidth).fill(false));
-    }
-    
-    // Get current row (top of tower)
-    let currentRow = towerState.visibleRows[towerState.visibleRows.length - 1];
-    
-    // Place block at current position
-    currentRow[towerState.currentRowProgress] = true;
-    towerState.currentRowProgress++;
-    
-    // Check if row is complete
-    if (towerState.currentRowProgress >= TOWER_CONFIG.towerWidth) {
-        towerState.currentRowProgress = 0;
-        
-        // Add new row
-        towerState.visibleRows.push(new Array(TOWER_CONFIG.towerWidth).fill(false));
-        
-        // Clear tower visually when it fills up (but keep total count)
-        if (towerState.visibleRows.length > TOWER_CONFIG.viewportHeight) {
-            towerState.visibleRows = [];
-            towerState.towersCompleted = (towerState.towersCompleted || 0) + 1;
-        }
-    }
-}
+      function placeBlock() {
+          towerState.totalBlocks++;
+          towerState.spendableBlocks++;
+          
+          // Check for win condition
+          if (!towerState.hasWon && towerState.totalBlocks >= 1000000) {
+              towerState.hasWon = true;
+              showWinCelebration();
+              saveTowerState();
+          }
+          
+          // Ensure we have a current row
+          if (towerState.visibleRows.length === 0) {
+              towerState.visibleRows.push(new Array(TOWER_CONFIG.towerWidth).fill(false));
+          }
+          
+          // Get current row (top of tower)
+          let currentRow = towerState.visibleRows[towerState.visibleRows.length - 1];
+          
+          // Place block at current position
+          currentRow[towerState.currentRowProgress] = true;
+          towerState.currentRowProgress++;
+          
+          // Check if row is complete
+          if (towerState.currentRowProgress >= TOWER_CONFIG.towerWidth) {
+              towerState.currentRowProgress = 0;
+              
+              // Add new row
+              towerState.visibleRows.push(new Array(TOWER_CONFIG.towerWidth).fill(false));
+              
+              // Clear tower visually when it fills up (but keep total count)
+              if (towerState.visibleRows.length > TOWER_CONFIG.viewportHeight) {
+                  towerState.visibleRows = [];
+                  towerState.towersCompleted = (towerState.towersCompleted || 0) + 1;
+              }
+          }
+      }
 
-function renderTower() {
-    if (!towerCtx) return;
-    
-    const ctx = towerCtx;
-    const blockSize = TOWER_CONFIG.blockSize;
-    
-    // Clear canvas with gradient background
-    const gradient = ctx.createLinearGradient(0, 0, 0, towerCanvas.height);
-    gradient.addColorStop(0, '#0d0d1a');
-    gradient.addColorStop(1, '#1a1a2e');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, towerCanvas.width, towerCanvas.height);
-    
-    // Draw blocks from bottom to top
-    const rowCount = towerState.visibleRows.length;
-    
-    for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
-        const row = towerState.visibleRows[rowIdx];
-        // Draw from bottom of canvas
-        const y = towerCanvas.height - (rowIdx + 1) * blockSize;
-        
-        for (let colIdx = 0; colIdx < row.length; colIdx++) {
-            if (row[colIdx]) {
-                const x = colIdx * blockSize;
-                
-                // Block fill
-                ctx.fillStyle = '#6a6a8a';
-                ctx.fillRect(x, y, blockSize - 1, blockSize - 1);
-                
-                // Subtle highlight
-                ctx.fillStyle = '#8a8aaa';
-                ctx.fillRect(x, y, blockSize - 1, 2);
-                ctx.fillRect(x, y, 2, blockSize - 1);
-                
-                // Subtle shadow
-                ctx.fillStyle = '#4a4a6a';
-                ctx.fillRect(x + blockSize - 3, y + 2, 2, blockSize - 3);
-                ctx.fillRect(x + 2, y + blockSize - 3, blockSize - 3, 2);
-            }
-        }
-    }
-}
+      function renderTower() {
+          if (!towerCtx) return;
+          
+          const ctx = towerCtx;
+          const blockSize = TOWER_CONFIG.blockSize;
+          
+          // Clear canvas with gradient background
+          const gradient = ctx.createLinearGradient(0, 0, 0, towerCanvas.height);
+          gradient.addColorStop(0, '#0d0d1a');
+          gradient.addColorStop(1, '#1a1a2e');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, towerCanvas.width, towerCanvas.height);
+          
+          // Draw blocks from bottom to top
+          const rowCount = towerState.visibleRows.length;
+          
+          for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+              const row = towerState.visibleRows[rowIdx];
+              // Draw from bottom of canvas
+              const y = towerCanvas.height - (rowIdx + 1) * blockSize;
+              
+              for (let colIdx = 0; colIdx < row.length; colIdx++) {
+                  if (row[colIdx]) {
+                      const x = colIdx * blockSize;
+                      
+                      // Block fill
+                      ctx.fillStyle = '#6a6a8a';
+                      ctx.fillRect(x, y, blockSize - 1, blockSize - 1);
+                      
+                      // Subtle highlight
+                      ctx.fillStyle = '#8a8aaa';
+                      ctx.fillRect(x, y, blockSize - 1, 2);
+                      ctx.fillRect(x, y, 2, blockSize - 1);
+                      
+                      // Subtle shadow
+                      ctx.fillStyle = '#4a4a6a';
+                      ctx.fillRect(x + blockSize - 3, y + 2, 2, blockSize - 3);
+                      ctx.fillRect(x + 2, y + blockSize - 3, blockSize - 3, 2);
+                  }
+              }
+          }
+      }
 
-function formatLargeNumber(num) {
-    if (num < 1000000) {
-        return num.toLocaleString();
-    }
-    
-    const exp = Math.floor(Math.log10(num));
-    const mantissa = num / Math.pow(10, exp);
-    return `${mantissa.toFixed(2)} × 10^${exp}`;
-}
+      function formatLargeNumber(num) {
+          if (num < 1000000) {
+              return num.toLocaleString();
+          }
+          
+          const exp = Math.floor(Math.log10(num));
+          const mantissa = num / Math.pow(10, exp);
+          return `${mantissa.toFixed(2)} × 10^${exp}`;
+      }
 
-function updateTowerStats() {
-    const heightEl = document.getElementById('towerHeight');
-    const blocksEl = document.getElementById('totalBlocks');
-    const spendableEl = document.getElementById('spendableBlocks');
-    const speedEl = document.getElementById('buildSpeed');
-    const towersEl = document.getElementById('towersCompleted');
-    
-    if (!heightEl) return;
-    
-    // Calculate total rows (including partial)
-    const completedRows = Math.floor(towerState.totalBlocks / TOWER_CONFIG.towerWidth);
-    
-    heightEl.textContent = formatLargeNumber(completedRows);
-    blocksEl.textContent = formatLargeNumber(towerState.totalBlocks);
-    if (spendableEl) spendableEl.textContent = formatLargeNumber(towerState.spendableBlocks);
-    speedEl.textContent = getBuildSpeed().toFixed(1);
-    towersEl.textContent = formatLargeNumber(towerState.towersCompleted || 0);
-}
+      function showWinCelebration() {
+          // Create overlay
+          const overlay = document.createElement('div');
+          overlay.id = 'winOverlay';
+          overlay.innerHTML = `
+              <div class="win-modal">
+                  <div class="win-sparkles">✨</div>
+                  <h2>🎉 Congratulations! 🎉</h2>
+                  <p>You've built <span class="win-highlight">1,000,000 blocks!</span></p>
+                  <p class="win-subtitle">Your tower has reached legendary heights!</p>
+                  <div class="win-stats">
+                      <div>Towers Completed: ${towerState.towersCompleted}</div>
+                      <div>Potions Brewed: ${state.potions ? state.potions.length : 0}</div>
+                      <div>Assistants Hired: ${towerState.assistants}</div>
+                  </div>
+                  <button class="win-btn" onclick="closeWinCelebration()">Continue Building</button>
+              </div>
+          `;
+          document.body.appendChild(overlay);
+      }
 
-// Update the switchTab function to handle tower tab
-const originalSwitchTab = typeof switchTab === 'function' ? switchTab : null;
-switchTab = function(tab) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    
-    if (tab === 'search') {
-        document.getElementById('searchPage').classList.add('active');
-        document.querySelectorAll('.tab-btn')[0].classList.add('active');
-    } else if (tab === 'mixer') {
-        document.getElementById('mixerPage').classList.add('active');
-        document.querySelectorAll('.tab-btn')[1].classList.add('active');
-    } else if (tab === 'tower') {
-        document.getElementById('towerPage').classList.add('active');
-        document.querySelectorAll('.tab-btn')[2].classList.add('active');
-        renderTower();
-        updateTowerStats();
-        updateUpgradeUI();
-    }
-};
+      function closeWinCelebration() {
+          const overlay = document.getElementById('winOverlay');
+          if (overlay) {
+              overlay.remove();
+          }
+      }
 
-// Update loadProgress to also load tower state
-const originalLoadProgress = typeof loadProgress === 'function' ? loadProgress : null;
-if (originalLoadProgress) {
-    const _origLoadProgress = loadProgress;
-    loadProgress = function() {
-        const result = _origLoadProgress();
-        loadTowerState();
-        return result;
-    };
-}
+      function updateTowerStats() {
+          const heightEl = document.getElementById('towerHeight');
+          const blocksEl = document.getElementById('totalBlocks');
+          const spendableEl = document.getElementById('spendableBlocks');
+          const speedEl = document.getElementById('buildSpeed');
+          const towersEl = document.getElementById('towersCompleted');
+          
+          if (!heightEl) return;
+          
+          // Calculate total rows (including partial)
+          const completedRows = Math.floor(towerState.totalBlocks / TOWER_CONFIG.towerWidth);
+          
+          heightEl.textContent = formatLargeNumber(completedRows);
+          blocksEl.textContent = formatLargeNumber(towerState.totalBlocks);
+          if (spendableEl) spendableEl.textContent = formatLargeNumber(towerState.spendableBlocks);
+          speedEl.textContent = getBuildSpeed().toFixed(1);
+          towersEl.textContent = formatLargeNumber(towerState.towersCompleted || 0);
+      }
 
-// Update initializeGame to init tower
-const originalInitializeGame = typeof initializeGame === 'function' ? initializeGame : null;
-if (originalInitializeGame) {
-    const _origInitializeGame = initializeGame;
-    initializeGame = function() {
-        _origInitializeGame();
-        initTower();
-    };
-}
+      // Update the switchTab function to handle tower tab
+      const originalSwitchTab = typeof switchTab === 'function' ? switchTab : null;
+      switchTab = function(tab) {
+          document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          
+          if (tab === 'search') {
+              document.getElementById('searchPage').classList.add('active');
+              document.querySelectorAll('.tab-btn')[0].classList.add('active');
+          } else if (tab === 'mixer') {
+              document.getElementById('mixerPage').classList.add('active');
+              document.querySelectorAll('.tab-btn')[1].classList.add('active');
+          } else if (tab === 'tower') {
+              document.getElementById('towerPage').classList.add('active');
+              document.querySelectorAll('.tab-btn')[2].classList.add('active');
+              renderTower();
+              updateTowerStats();
+              updateUpgradeUI();
+          }
+      };
 
-// Save tower state when page unloads
-window.addEventListener('beforeunload', () => {
-    saveTowerState();
-});
+      // Update loadProgress to also load tower state
+      const originalLoadProgress = typeof loadProgress === 'function' ? loadProgress : null;
+      if (originalLoadProgress) {
+          const _origLoadProgress = loadProgress;
+          loadProgress = function() {
+              const result = _origLoadProgress();
+              loadTowerState();
+              return result;
+          };
+      }
+
+      // Update initializeGame to init tower
+      const originalInitializeGame = typeof initializeGame === 'function' ? initializeGame : null;
+      if (originalInitializeGame) {
+          const _origInitializeGame = initializeGame;
+          initializeGame = function() {
+              _origInitializeGame();
+              initTower();
+          };
+      }
+
+      // Save tower state when page unloads
+      window.addEventListener('beforeunload', () => {
+          saveTowerState();
+      });
         // ========== GLOBAL DATA ==========
         let INGREDIENTS_DATA = [];
         let POTIONS_DATA = {};
@@ -798,30 +836,116 @@ window.addEventListener('beforeunload', () => {
         }
 
         function handleTouchStart(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const target = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (target && target.dataset.row) {
-                state.currentSelection = [[parseInt(target.dataset.row), parseInt(target.dataset.col)]];
-                target.classList.add('selected');
-            }
-        }
+          e.preventDefault();
+          const touch = e.touches[0];
+          const target = document.elementFromPoint(touch.clientX, touch.clientY);
+          if (target && target.dataset.row !== undefined) {
+              const row = parseInt(target.dataset.row);
+              const col = parseInt(target.dataset.col);
+              touchStartCell = { row, col };
+              state.currentSelection = [[row, col]];
+              
+              // Clear previous selection styling
+              document.querySelectorAll('.grid-cell.selected').forEach(cell => {
+                  if (!cell.classList.contains('found')) {
+                      cell.classList.remove('selected');
+                  }
+              });
+              
+              target.classList.add('selected');
+          }
+      }
 
-        function handleTouchMove(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const target = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (target && target.dataset.row && state.currentSelection.length > 0) {
-                const row = parseInt(target.dataset.row);
-                const col = parseInt(target.dataset.col);
-                
-                const last = state.currentSelection[state.currentSelection.length - 1];
-                if (last[0] !== row || last[1] !== col) {
-                    state.currentSelection.push([row, col]);
-                    target.classList.add('selected');
-                }
-            }
-        }
+      function handleTouchMove(e) {
+          e.preventDefault();
+          if (!touchStartCell) return;
+          
+          const touch = e.touches[0];
+          const target = document.elementFromPoint(touch.clientX, touch.clientY);
+          
+          if (!target || target.dataset.row === undefined) return;
+          
+          const currentRow = parseInt(target.dataset.row);
+          const currentCol = parseInt(target.dataset.col);
+          const startRow = touchStartCell.row;
+          const startCol = touchStartCell.col;
+          
+          // Calculate direction from start to current position
+          const dRow = currentRow - startRow;
+          const dCol = currentCol - startCol;
+          
+          // If we haven't moved, just show starting cell
+          if (dRow === 0 && dCol === 0) {
+              state.currentSelection = [[startRow, startCol]];
+              updateTouchSelection();
+              return;
+          }
+          
+          // Calculate the angle from start to current position
+          const angle = Math.atan2(dRow, dCol);
+          
+          // Define the 8 possible directions with their angles
+          const directions = [
+              { row: 0, col: 1, angle: 0 },                    // East
+              { row: 1, col: 1, angle: Math.PI / 4 },          // Southeast
+              { row: 1, col: 0, angle: Math.PI / 2 },          // South
+              { row: 1, col: -1, angle: 3 * Math.PI / 4 },     // Southwest
+              { row: 0, col: -1, angle: Math.PI },             // West
+              { row: -1, col: -1, angle: -3 * Math.PI / 4 },   // Northwest
+              { row: -1, col: 0, angle: -Math.PI / 2 },        // North
+              { row: -1, col: 1, angle: -Math.PI / 4 }         // Northeast
+          ];
+          
+          // Find the direction with the smallest angular difference
+          let bestDirection = directions[0];
+          let smallestDiff = Math.PI;
+          
+          for (const dir of directions) {
+              let diff = Math.abs(angle - dir.angle);
+              // Handle wraparound (e.g., -π and π are the same)
+              if (diff > Math.PI) diff = 2 * Math.PI - diff;
+              
+              if (diff < smallestDiff) {
+                  smallestDiff = diff;
+                  bestDirection = dir;
+              }
+          }
+          
+          // Build the selection path from start in the best direction
+          state.currentSelection = [[startRow, startCol]];
+          
+          // Calculate how many steps to take based on distance
+          const steps = Math.max(Math.abs(dRow), Math.abs(dCol));
+          
+          for (let i = 1; i <= steps; i++) {
+              const newRow = startRow + (bestDirection.row * i);
+              const newCol = startCol + (bestDirection.col * i);
+              
+              // Check if still in bounds
+              if (newRow < 0 || newRow >= GRID_SIZE || newCol < 0 || newCol >= GRID_SIZE) {
+                  break;
+              }
+              
+              state.currentSelection.push([newRow, newCol]);
+          }
+          
+          updateTouchSelection();
+      }
+
+      function updateTouchSelection() {
+          // Clear all non-found selected cells
+          document.querySelectorAll('.grid-cell.selected').forEach(cell => {
+              if (!cell.classList.contains('found')) {
+                  cell.classList.remove('selected');
+              }
+          });
+          
+          // Apply selection to current path
+          state.currentSelection.forEach(([r, c]) => {
+              const cell = document.querySelector(`[data-row='${r}'][data-col='${c}']`);
+              if (cell) cell.classList.add('selected');
+          });
+      }
 
         function startSelection(e) {
             state.currentSelection = [[parseInt(e.target.dataset.row), parseInt(e.target.dataset.col)]];
@@ -903,11 +1027,13 @@ window.addEventListener('beforeunload', () => {
             });
         }
 
+        
         function endSelection() {
             if (state.currentSelection.length > 0) {
                 checkWord();
                 clearSelection();
             }
+            touchStartCell = null; // Reset touch start
         }
 
         function clearSelection() {
@@ -917,6 +1043,7 @@ window.addEventListener('beforeunload', () => {
                 }
             });
             state.currentSelection = [];
+            touchStartCell = null;
         }
 
         function checkWord() {
