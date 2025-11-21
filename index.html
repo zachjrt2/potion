@@ -31,6 +31,10 @@
                 <div class="panel">
                     <h2>Current Puzzle</h2>
                     <div class="words-list" id="wordsList"></div>
+                    <ul>
+                      <li>Multiword Ingredients are split up, find all it's words to unlock that ingredient</li><br>
+                      <li>Unlocked Ingredients are permanently saved, so feel free to regenerate the puzzle to find more</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -39,6 +43,10 @@
             <div class="main-grid">
                 <div class="panel">
                     <h2>Ingredients</h2>
+                     <ul>
+                      <li>Mix any combination of 3 ingredients to make a potion</li><br>
+                      <li>Already Discovered recipies will gray out the last ingredient it used, so it is easier to find new ones</li><br>
+                    </ul>
                     <div class="ingredients-grid" id="ingredientsGrid"></div>
                     <button class="mix-button" id="mixButton" disabled>Mix Potion</button>
                     <div class="export-buttons">
@@ -67,6 +75,7 @@
         <div><span class="stat-label">Spendable Blocks:</span> <span class="stat-value" id="spendableBlocks">0</span></div>
         <div><span class="stat-label">Towers Completed:</span> <span class="stat-value" id="towersCompleted">0</span></div>
         <div><span class="stat-label">Build Speed:</span> <span class="stat-value" id="buildSpeed">0</span> <span class="stat-label">blocks/sec</span></div>
+        <div>Find potions to increase the build speed</div>
     </div>
     
     <div class="upgrade-section">
